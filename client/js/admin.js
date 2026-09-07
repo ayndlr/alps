@@ -1,0 +1,11 @@
+const s=document.createElement("script");s.src="/js/common.js";s.onload=init;s.onerror=()=>{};document.head.appendChild(s);
+async function init(){
+ const u=JSON.parse(localStorage.getItem(USER_KEY)||"null"); if(!u||u.role!=="admin"){location.href="/";return}
+ setupNavigation(); loadStats(); loadEmployees(); loadLeaves();
+ document.querySelector("#showCreate").onclick=()=>document.querySelector("#createBox").classList.toggle("hidden");
+ document.querySelector("#employeeForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const body=Object.fromEntries(f);try{const d=await api("/api/admin/employees",{method:"POST",body:JSON.stringify(body)});document.querySelector("#employeeMsg").textContent=`Created ${d.employee.firstName} ${d.employee.lastName}. Username: ${d.credentials.username}`;e.target.reset();loadEmployees();loadStats()}catch(x){document.querySelector("#employeeMsg").textContent=x.message}};
+}
+async function loadStats(){try{const d=await api("/api/admin/stats");["employees","pending","approved","rejected"].forEach(k=>document.querySelector("#s"+k[0].toUpperCase()+k.slice(1)).textContent=d[k])}catch{}}
+async function loadEmployees(){const rows=document.querySelector("#employeeRows");try{const ds=await api("/api/admin/employees");rows.innerHTML=ds.map(e=>`<tr><td>${e.firstName} ${e.lastName}</td><td>${e.employeeId}</td><td>${e.department||"-"}</td><td>${e.position||"-"}</td></tr>`).join("")}catch{}}
+async function loadLeaves(){const rows=document.querySelector("#leaveRows");try{const ds=await api("/api/admin/leaves");rows.innerHTML=ds.map(l=>`<tr><td>${l.employeeId?.firstName||""} ${l.employeeId?.lastName||""}</td><td>${l.leaveType}</td><td>${fmtDate(l.startDate)} - ${fmtDate(l.endDate)}</td><td>${l.duration}</td><td>${badge(l.status)}</td><td>${l.status==="pending"?`<button class="action-btn approve" onclick="review('${l._id}','approved')">✓</button> <button class="action-btn reject" onclick="review('${l._id}','rejected')">×</button>`:"—"}</td></tr>`).join("")}catch{}}
+async function review(id,status){const comment=status==="rejected"?prompt("Reason for rejection:")||"":"Approved by administrator";try{await api(`/api/admin/leaves/${id}/review`,{method:"PATCH",body:JSON.stringify({status,comment})});loadLeaves();loadStats()}catch(e){alert(e.message)}}

@@ -1,0 +1,14 @@
+const s=document.createElement("script");s.src="/js/common.js";s.onload=init;s.onerror=()=>{};document.head.appendChild(s);
+async function init(){
+ const u=JSON.parse(localStorage.getItem(USER_KEY)||"null"); if(!u||u.role!=="employee"){location.href="/";return}
+ setupNavigation(); const emp=u.employee; document.querySelector("#greeting").textContent=`Welcome, ${emp?.firstName||u.username} 👋`;document.querySelector("#employeeInfo").textContent=`${emp?.employeeId||""} • ${emp?.department||"Employee"}`;
+ renderBalances(emp); loadMine();
+ if(u.firstLogin) showPage("password");
+ document.querySelector("#leaveForm").onsubmit=submitLeave;
+ document.querySelector("#passwordForm").onsubmit=changePassword;
+}
+function renderBalances(e){const b=e?.leaveBalances||{};const names={annual:"Annual",sick:"Sick",maternity:"Maternity",paternity:"Paternity",compassionate:"Compassionate",study:"Study",casual:"Casual"};document.querySelector("#balances").innerHTML=Object.entries(names).map(([k,n])=>`<div class="card"><small>${n} leave</small><strong>${b[k]??0}</strong><small>days remaining</small></div>`).join("")}
+async function loadMine(){try{const ds=await api("/api/leaves/mine");document.querySelector("#myRows").innerHTML=ds.map(l=>`<tr><td>${l.leaveType}</td><td>${fmtDate(l.startDate)} - ${fmtDate(l.endDate)}</td><td>${l.duration}</td><td>${badge(l.status)}</td><td>${l.status==="pending"?`<button class="action-btn danger" onclick="cancelLeave('${l._id}')">Cancel</button>`:""}</td></tr>`).join("")}catch{}}
+async function submitLeave(e){e.preventDefault();const body=Object.fromEntries(new FormData(e.target));const msg=document.querySelector("#leaveMsg");try{const l=await api("/api/leaves",{method:"POST",body:JSON.stringify(body)});msg.textContent=`Application submitted for ${l.duration} working day(s).`;e.target.reset();loadMine()}catch(x){msg.textContent=x.message}}
+async function cancelLeave(id){if(!confirm("Cancel this application?"))return;try{await api(`/api/leaves/${id}/cancel`,{method:"PATCH"});loadMine()}catch(e){alert(e.message)}}
+async function changePassword(e){e.preventDefault();const f=new FormData(e.target);if(f.get("newPassword")!==f.get("confirm")){document.querySelector("#passwordMsg").textContent="Passwords do not match";return}try{await api("/api/auth/change-password",{method:"POST",body:JSON.stringify({currentPassword:f.get("currentPassword"),newPassword:f.get("newPassword")})});const u=JSON.parse(localStorage.getItem(USER_KEY));u.firstLogin=false;localStorage.setItem(USER_KEY,JSON.stringify(u));document.querySelector("#passwordMsg").textContent="Password changed successfully.";e.target.reset();showPage("home")}catch(x){document.querySelector("#passwordMsg").textContent=x.message}}
